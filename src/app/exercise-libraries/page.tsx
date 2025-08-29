@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { createContext, use, useReducer, ReactNode } from 'react';
+import { create } from 'zustand';
 
 // Types
 const enum Step {
@@ -52,18 +52,6 @@ interface BookingState {
 
 // Action types
 type BookingAction =
-  | {
-      type: 'flightSearchUpdated';
-      payload: Partial<{
-        destination: string;
-        departure: string;
-        arrival: string;
-        passengers: number;
-        isOneWay: boolean;
-      }>;
-    }
-  | { type: 'searchFlights' }
-  | { type: 'flightSelected'; payload: { flight: FlightOption } }
   | { type: 'changeFlight' }
   | {
       type: 'hotelSearchUpdated';
@@ -75,10 +63,8 @@ type BookingAction =
       }>;
     }
   | { type: 'searchHotels' }
-  | { type: 'hotelSelected'; payload: { hotel: HotelOption } }
   | { type: 'changeHotel' }
   | { type: 'book' }
-  | { type: 'back' };
 
 const initialState: BookingState = {
   currentStep: Step.FlightSearch,
@@ -99,125 +85,82 @@ const initialState: BookingState = {
   selectedHotel: null,
 };
 
-// Reducer
-function bookingReducer(
-  state: BookingState,
-  action: BookingAction
-): BookingState {
-  switch (action.type) {
-    case 'flightSearchUpdated':
-      return {
-        ...state,
-        flightSearch: { ...state.flightSearch, ...action.payload },
-      };
-    case 'searchFlights':
-      return {
-        ...state,
-        currentStep: Step.FlightResults,
-      };
-    case 'flightSelected':
-      return {
-        ...state,
-        selectedFlight: action.payload.flight,
-        currentStep: Step.HotelSearch,
-      };
-    case 'changeFlight':
-      return {
-        ...state,
-        currentStep: Step.FlightSearch,
-      };
-    case 'hotelSearchUpdated':
-      return {
-        ...state,
-        hotelSearch: { ...state.hotelSearch, ...action.payload },
-      };
-    case 'searchHotels':
-      return {
-        ...state,
-        currentStep: Step.HotelResults,
-      };
-    case 'hotelSelected':
-      return {
-        ...state,
-        selectedHotel: action.payload.hotel,
-        currentStep: Step.Review,
-      };
-    case 'changeHotel':
-      return {
-        ...state,
-        currentStep: Step.HotelSearch,
-      };
-    case 'book':
-      return {
-        ...state,
-        currentStep: Step.Confirmation,
-      };
-    case 'back':
-      switch (state.currentStep) {
-        case Step.FlightResults:
-          return {
-            ...state,
-            currentStep: Step.FlightSearch,
-          };
-        case Step.HotelSearch:
-          return {
-            ...state,
-            currentStep: Step.FlightResults,
-          };
-        case Step.HotelResults:
-          return {
-            ...state,
-            currentStep: Step.HotelSearch,
-          };
-        case Step.Review:
-          return {
-            ...state,
-            currentStep: Step.HotelResults,
-          };
-        default:
-          return state;
-      }
-    default:
-      return state;
-  }
-}
+const useBookingStore = create<BookingState & {
+  searchFlights: () => void;
+  flightSearchUpdated: (payload: Partial<{
+    destination: string;
+    departure: string;
+    arrival: string;
+    passengers: number;
+    isOneWay: boolean;
+  }>) => void;
+  flightSelected: (flight: FlightOption) => void;
+  back: () => void;
+  searchHotels: () => void;
+  hotelSelected: (hotel: HotelOption) => void;
+  hotelSearchUpdated: (payload: Partial<{
+    checkIn: string;
+    checkOut: string;
+    guests: number;
+    roomType: string;
+  }>) => void;
+  book: () => void;
+  changeFlight: () => void;
+  changeHotel: () => void;
+}>((set) => ({
+  currentStep: Step.FlightSearch,
+  flightSearch: {
+    destination: '',
+    departure: '',
+    arrival: '',
+    passengers: 1,
+    isOneWay: false,
+  },
+  selectedFlight: null,
+  hotelSearch: {
+    checkIn: '',
+    checkOut: '',
+    guests: 1,
+    roomType: 'standard',
+  },
+  selectedHotel: null,
 
-// Context
-interface BookingContextType {
-  state: BookingState;
-  dispatch: React.Dispatch<BookingAction>;
-}
-
-const BookingContext = createContext<BookingContextType | undefined>(undefined);
-
-// Provider
-function BookingProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(bookingReducer, initialState);
-
-  return (
-    <BookingContext.Provider value={{ state, dispatch }}>
-      {children}
-    </BookingContext.Provider>
-  );
-}
-
-// Hook to use booking context
-function useBooking() {
-  const context = use(BookingContext);
-  if (context === undefined) {
-    throw new Error('useBooking must be used within a BookingProvider');
-  }
-  return context;
-}
+  searchFlights: () => set({ currentStep: Step.FlightResults }),
+  flightSearchUpdated: (payload) => set((state) => ({ 
+    flightSearch: { ...state.flightSearch, ...payload } 
+  })),
+  flightSelected: (flight) => set({ selectedFlight: flight, currentStep: Step.HotelSearch }),
+  back: () => set((state) => {
+    switch (state.currentStep) {
+      case Step.FlightResults:
+        return { currentStep: Step.FlightSearch };
+      case Step.HotelSearch:
+        return { currentStep: Step.FlightResults };
+      case Step.HotelResults:
+        return { currentStep: Step.HotelSearch };
+      case Step.Review:
+        return { currentStep: Step.HotelResults };
+      default:
+        return {};
+    }
+  }),
+  searchHotels: () => set({ currentStep: Step.HotelResults }),
+  hotelSelected: (hotel) => set({ selectedHotel: hotel, currentStep: Step.Review }),
+  hotelSearchUpdated: (payload) => set((state) => ({ 
+    hotelSearch: { ...state.hotelSearch, ...payload } 
+  })),
+  book: () => set({ currentStep: Step.Confirmation }),
+  changeFlight: () => set({ currentStep: Step.FlightSearch }),
+  changeHotel: () => set({ currentStep: Step.HotelSearch }),
+}));
 
 function FlightBookingForm() {
-  const { state, dispatch } = useBooking();
-  const flightSearch = state.flightSearch;
-
+  const { flightSearch, searchFlights, flightSearchUpdated } = useBookingStore();
+  
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    dispatch({ type: 'searchFlights' });
+    searchFlights();
   };
 
   return (
@@ -227,10 +170,7 @@ function FlightBookingForm() {
           id="one-way"
           checked={flightSearch.isOneWay}
           onCheckedChange={(checked) =>
-            dispatch({
-              type: 'flightSearchUpdated',
-              payload: { isOneWay: checked },
-            })
+            flightSearchUpdated({ isOneWay: checked })
           }
         />
         <Label htmlFor="one-way">One-way flight</Label>
@@ -243,10 +183,7 @@ function FlightBookingForm() {
           id="destination"
           value={flightSearch.destination}
           onChange={(e) =>
-            dispatch({
-              type: 'flightSearchUpdated',
-              payload: { destination: e.target.value },
-            })
+            flightSearchUpdated({ destination: e.target.value })
           }
           required
         />
@@ -259,10 +196,7 @@ function FlightBookingForm() {
           id="departure"
           value={flightSearch.departure}
           onChange={(e) =>
-            dispatch({
-              type: 'flightSearchUpdated',
-              payload: { departure: e.target.value },
-            })
+            flightSearchUpdated({ departure: e.target.value })
           }
           required
         />
@@ -276,10 +210,7 @@ function FlightBookingForm() {
             id="arrival"
             value={flightSearch.arrival}
             onChange={(e) =>
-              dispatch({
-                type: 'flightSearchUpdated',
-                payload: { arrival: e.target.value },
-              })
+              flightSearchUpdated({ arrival: e.target.value })
             }
             required
           />
@@ -293,10 +224,7 @@ function FlightBookingForm() {
           id="passengers"
           value={flightSearch.passengers}
           onChange={(e) =>
-            dispatch({
-              type: 'flightSearchUpdated',
-              payload: { passengers: parseInt(e.target.value) },
-            })
+            flightSearchUpdated({ passengers: parseInt(e.target.value) })
           }
           min="1"
           max="9"
@@ -312,8 +240,7 @@ function FlightBookingForm() {
 }
 
 function FlightSearchResults() {
-  const { state, dispatch } = useBooking();
-  const selectedFlight = state.selectedFlight;
+  const { back, selectedFlight, flightSelected } = useBookingStore();
 
   const mockFlights: FlightOption[] = [
     { id: '1', airline: 'Sky Airways', price: 299, duration: '2h 30m' },
@@ -322,7 +249,7 @@ function FlightSearchResults() {
   ];
 
   const handleSelectFlight = (flight: FlightOption) => {
-    dispatch({ type: 'flightSelected', payload: { flight } });
+    flightSelected(flight);
   };
 
   return (
@@ -331,9 +258,7 @@ function FlightSearchResults() {
         <h2 className="text-2xl font-bold">Available Flights</h2>
         <Button
           variant="outline"
-          onClick={() => {
-            dispatch({ type: 'back' });
-          }}
+          onClick={back}
         >
           Back to Search
         </Button>
@@ -372,12 +297,11 @@ function FlightSearchResults() {
 }
 
 function HotelBookingForm() {
-  const { state, dispatch } = useBooking();
-  const hotelSearch = state.hotelSearch;
+  const { back, hotelSearch, searchHotels, hotelSearchUpdated } = useBookingStore();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    dispatch({ type: 'searchHotels' });
+    searchHotels();
   };
 
   return (
@@ -386,9 +310,7 @@ function HotelBookingForm() {
         <h2 className="text-2xl font-bold">Hotel Search</h2>
         <Button
           variant="outline"
-          onClick={() => {
-            dispatch({ type: 'back' });
-          }}
+          onClick={back}
         >
           Back to Flights
         </Button>
@@ -400,10 +322,7 @@ function HotelBookingForm() {
           id="checkIn"
           value={hotelSearch.checkIn}
           onChange={(e) =>
-            dispatch({
-              type: 'hotelSearchUpdated',
-              payload: { checkIn: e.target.value },
-            })
+            hotelSearchUpdated({ checkIn: e.target.value })
           }
           required
         />
@@ -416,10 +335,7 @@ function HotelBookingForm() {
           id="checkOut"
           value={hotelSearch.checkOut}
           onChange={(e) =>
-            dispatch({
-              type: 'hotelSearchUpdated',
-              payload: { checkOut: e.target.value },
-            })
+            hotelSearchUpdated({ checkOut: e.target.value })
           }
           required
         />
@@ -432,10 +348,7 @@ function HotelBookingForm() {
           id="guests"
           value={hotelSearch.guests}
           onChange={(e) =>
-            dispatch({
-              type: 'hotelSearchUpdated',
-              payload: { guests: parseInt(e.target.value) },
-            })
+            hotelSearchUpdated({ guests: parseInt(e.target.value) })
           }
           min="1"
           max="4"
@@ -449,10 +362,7 @@ function HotelBookingForm() {
           id="roomType"
           value={hotelSearch.roomType}
           onChange={(e) =>
-            dispatch({
-              type: 'hotelSearchUpdated',
-              payload: { roomType: e.target.value },
-            })
+            hotelSearchUpdated({ roomType: e.target.value })
           }
           className="w-full p-2 border rounded"
           required
@@ -471,8 +381,7 @@ function HotelBookingForm() {
 }
 
 function HotelSearchResults() {
-  const { state, dispatch } = useBooking();
-  const selectedHotel = state.selectedHotel;
+  const { back, hotelSelected, selectedHotel } = useBookingStore();
 
   const mockHotels: HotelOption[] = [
     {
@@ -498,19 +407,13 @@ function HotelSearchResults() {
     },
   ];
 
-  const handleSelectHotel = (hotel: HotelOption) => {
-    dispatch({ type: 'hotelSelected', payload: { hotel } });
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Available Hotels</h2>
         <Button
           variant="outline"
-          onClick={() => {
-            dispatch({ type: 'back' });
-          }}
+          onClick={back}
         >
           Back to Search
         </Button>
@@ -536,7 +439,7 @@ function HotelSearchResults() {
                 <p className="text-xl font-bold">${hotel.price}/night</p>
                 <Button
                   className="mt-2"
-                  onClick={() => handleSelectHotel(hotel)}
+                  onClick={() => hotelSelected(hotel)}
                 >
                   Select
                 </Button>
@@ -550,18 +453,14 @@ function HotelSearchResults() {
 }
 
 function BookingReview() {
-  const { state, dispatch } = useBooking();
-  const selectedFlight = state.selectedFlight;
-  const selectedHotel = state.selectedHotel;
-  const flightSearch = state.flightSearch;
-  const hotelSearch = state.hotelSearch;
+  const { back, book, selectedFlight, selectedHotel, flightSearch, hotelSearch, changeFlight, changeHotel } = useBookingStore();
 
   const handleConfirm = () => {
-    dispatch({ type: 'book' });
+    book();
   };
 
   const handleBack = () => {
-    dispatch({ type: 'back' });
+    back();
   };
 
   return (
@@ -578,9 +477,7 @@ function BookingReview() {
           <Button
             variant="outline"
             className="mt-2"
-            onClick={() => {
-              dispatch({ type: 'changeFlight' });
-            }}
+            onClick={changeFlight}
           >
             Change Flight
           </Button>
@@ -596,9 +493,7 @@ function BookingReview() {
           <Button
             variant="outline"
             className="mt-2"
-            onClick={() => {
-              dispatch({ type: 'changeHotel' });
-            }}
+            onClick={changeHotel}
           >
             Change Hotel
           </Button>
@@ -623,9 +518,7 @@ function BookingReview() {
 }
 
 function BookingConfirmation() {
-  const { state } = useBooking();
-  const selectedFlight = state.selectedFlight;
-  const selectedHotel = state.selectedHotel;
+  const { selectedFlight, selectedHotel } = useBookingStore();
 
   return (
     <div className="text-center space-y-6">
@@ -646,11 +539,10 @@ function BookingConfirmation() {
 
 // Main Component
 function BookingApp() {
-  const { state } = useBooking();
-  const step = state.currentStep;
+  const { currentStep } = useBookingStore();
 
   const renderStep = () => {
-    switch (step) {
+    switch (currentStep) {
       case Step.FlightSearch:
         return <FlightBookingForm />;
       case Step.FlightResults:
@@ -678,8 +570,6 @@ function BookingApp() {
 
 export default function Exercise8() {
   return (
-    <BookingProvider>
-      <BookingApp />
-    </BookingProvider>
+    <BookingApp />
   );
 }

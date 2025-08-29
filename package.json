@@ -36,7 +36,8 @@
     "react-day-picker": "8.10.1",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.3.0",
-    "zod": "^3.25.45"
+    "zod": "^3.25.45",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
