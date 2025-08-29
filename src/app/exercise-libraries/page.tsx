@@ -66,25 +66,6 @@ type BookingAction =
   | { type: 'changeHotel' }
   | { type: 'book' }
 
-const initialState: BookingState = {
-  currentStep: Step.FlightSearch,
-  flightSearch: {
-    destination: '',
-    departure: '',
-    arrival: '',
-    passengers: 1,
-    isOneWay: false,
-  },
-  selectedFlight: null,
-  hotelSearch: {
-    checkIn: '',
-    checkOut: '',
-    guests: 1,
-    roomType: 'standard',
-  },
-  selectedHotel: null,
-};
-
 const useBookingStore = create<BookingState & {
   searchFlights: () => void;
   flightSearchUpdated: (payload: Partial<{
