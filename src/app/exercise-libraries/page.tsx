@@ -155,13 +155,17 @@ const useBookingStore = create<BookingState & {
 }));
 
 function FlightBookingForm() {
-  const { flightSearch, searchFlights, flightSearchUpdated } = useBookingStore();
+  const flightSearch = useBookingStore((state) => state.flightSearch);
+  const searchFlights = useBookingStore((state) => state.searchFlights);
+  const flightSearchUpdated = useBookingStore((state) => state.flightSearchUpdated);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     searchFlights();
   };
+
+  console.log('rerendering FlightBookingForm')
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -252,6 +256,8 @@ function FlightSearchResults() {
     flightSelected(flight);
   };
 
+  console.log('rerendering FlightSearchResults')
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -303,6 +309,8 @@ function HotelBookingForm() {
     e.preventDefault();
     searchHotels();
   };
+
+  console.log('rerendering HotelBookingForm')
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -383,6 +391,8 @@ function HotelBookingForm() {
 function HotelSearchResults() {
   const { back, hotelSelected, selectedHotel } = useBookingStore();
 
+  console.log('rerendering HotelSearchResults')
+
   const mockHotels: HotelOption[] = [
     {
       id: '1',
@@ -406,6 +416,8 @@ function HotelSearchResults() {
       amenities: ['Gym', 'Restaurant', 'Business Center'],
     },
   ];
+
+  console.log('rerendering BookingReview')
 
   return (
     <div className="space-y-6">
@@ -454,6 +466,8 @@ function HotelSearchResults() {
 
 function BookingReview() {
   const { back, book, selectedFlight, selectedHotel, flightSearch, hotelSearch, changeFlight, changeHotel } = useBookingStore();
+
+  console.log('rerendering BookingReview')
 
   const handleConfirm = () => {
     book();
@@ -520,6 +534,8 @@ function BookingReview() {
 function BookingConfirmation() {
   const { selectedFlight, selectedHotel } = useBookingStore();
 
+  console.log('rerendering BookingConfirmation')
+
   return (
     <div className="text-center space-y-6">
       <div className="text-6xl">🎉</div>
@@ -539,7 +555,9 @@ function BookingConfirmation() {
 
 // Main Component
 function BookingApp() {
-  const { currentStep } = useBookingStore();
+  const currentStep = useBookingStore((state) => state.currentStep);
+
+  console.log('rerendering BookingApp')
 
   const renderStep = () => {
     switch (currentStep) {
@@ -569,6 +587,7 @@ function BookingApp() {
 }
 
 export default function Exercise8() {
+  console.log('rerendering Exercise8')
   return (
     <BookingApp />
   );
