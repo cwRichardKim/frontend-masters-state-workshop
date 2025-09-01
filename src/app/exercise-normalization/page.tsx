@@ -13,29 +13,33 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus, MapPin, CheckSquare } from 'lucide-react';
 
+type Brand<T, K> = T & {__brand: K}
+type TodoId = Brand<string, 'TodoId'>;
+type DestinationId = Brand<string, 'DestinationId'>;
+
 // Types
 interface TodoItem {
-  id: string;
   text: string;
 }
 
 interface Destination {
-  id: string;
+  id: DestinationId;
   name: string;
-  todos: TodoItem[];
+  todoIds: TodoId[];
 }
 
 interface ItineraryState {
   destinations: Destination[];
+  todos: { [id: TodoId]: TodoItem };
 }
 
 // Action types
 type Action =
   | { type: 'ADD_DESTINATION' }
-  | { type: 'UPDATE_DESTINATION'; destinationId: string; name: string }
-  | { type: 'DELETE_DESTINATION'; destinationId: string }
-  | { type: 'ADD_TODO'; destinationId: string; text: string }
-  | { type: 'DELETE_TODO'; destinationId: string; todoId: string };
+  | { type: 'UPDATE_DESTINATION'; destinationId: DestinationId; name: string }
+  | { type: 'DELETE_DESTINATION'; destinationId: DestinationId }
+  | { type: 'ADD_TODO'; destinationId: DestinationId; text: string }
+  | { type: 'DELETE_TODO'; destinationId: DestinationId; todoId: TodoId };
 
 // Reducer function
 function itineraryReducer(
@@ -48,7 +52,7 @@ function itineraryReducer(
         ...state,
         destinations: [
           ...state.destinations,
-          { id: crypto.randomUUID(), name: '', todos: [] },
+          { id: crypto.randomUUID() as DestinationId, name: '', todoIds: [] },
         ],
       };
     case 'UPDATE_DESTINATION':
@@ -66,21 +70,21 @@ function itineraryReducer(
         destinations: state.destinations.filter(
           (dest) => dest.id !== action.destinationId
         ),
+        // clear deleted todo
       };
     case 'ADD_TODO':
+      const newTodoId = crypto.randomUUID() as TodoId;
       return {
         ...state,
         destinations: state.destinations.map((dest) =>
           dest.id === action.destinationId
             ? {
                 ...dest,
-                todos: [
-                  ...dest.todos,
-                  { id: crypto.randomUUID(), text: action.text },
-                ],
+                todoIds: [...dest.todoIds, newTodoId],
               }
             : dest
         ),
+        todos: { ...state.todos, [newTodoId]: { text: action.text } },
       };
     case 'DELETE_TODO':
       return {
@@ -89,10 +93,11 @@ function itineraryReducer(
           dest.id === action.destinationId
             ? {
                 ...dest,
-                todos: dest.todos.filter((todo) => todo.id !== action.todoId),
+                todoIds: dest.todoIds.filter((id) => id !== action.todoId),
               }
             : dest
         ),
+        todos: { ...state.todos, [action.todoId as TodoId]: undefined as unknown as TodoItem },
       };
     default:
       return state;
@@ -102,6 +107,7 @@ function itineraryReducer(
 export default function ItineraryPage() {
   const [state, dispatch] = useReducer(itineraryReducer, {
     destinations: [],
+    todos: {},
   });
   const lastInputRef = useRef<HTMLInputElement>(null);
 
@@ -214,7 +220,7 @@ export default function ItineraryPage() {
                     </Button>
                   </form>
 
-                  {destination.todos.length > 0 ? (
+                  {destination.todoIds.length > 0 ? (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 mb-2">
                         <CheckSquare className="h-4 w-4 text-muted-foreground" />
@@ -222,17 +228,17 @@ export default function ItineraryPage() {
                           Things to do
                         </span>
                         <Badge variant="secondary">
-                          {destination.todos.length}
+                          {destination.todoIds.length}
                         </Badge>
                       </div>
                       <ul className="space-y-2">
-                        {destination.todos.map((todo) => (
+                        {destination.todoIds.map((todoId) => (
                           <li
-                            key={todo.id}
+                            key={todoId}
                             className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors"
                           >
                             <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
-                            <span className="flex-1 text-sm">{todo.text}</span>
+                            <span className="flex-1 text-sm">{state.todos[todoId].text}</span>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -240,7 +246,7 @@ export default function ItineraryPage() {
                                 dispatch({
                                   type: 'DELETE_TODO',
                                   destinationId: destination.id,
-                                  todoId: todo.id,
+                                  todoId: todoId,
                                 })
                               }
                               className="text-muted-foreground hover:text-destructive h-auto p-1"
