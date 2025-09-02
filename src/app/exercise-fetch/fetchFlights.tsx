@@ -6,6 +6,7 @@ export async function fetchFlights(
   searchParams: FlightSearch
 ): Promise<FlightOption[]> {
   // Simulate API delay
+  console.log('fetching flights', searchParams);
   await new Promise((resolve) => setTimeout(resolve, 500));
 
   return [
