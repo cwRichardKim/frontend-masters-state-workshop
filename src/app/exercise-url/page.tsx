@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useState } from 'react';
 import { LoadingSkeleton } from './LoadingSkeleton';
+import { parseAsBoolean, parseAsString, parseAsStringEnum, useQueryState } from 'nuqs';
 
 interface Layover {
   city: string;
@@ -32,12 +33,11 @@ function SearchResults({
   onBack,
   isLoading,
 }: SearchResultsProps & { isLoading: boolean }) {
-  const [selectedFlight, setSelectedFlight] = useState<FlightOption | null>(
-    null
-  );
-  const [showDirectOnly, setShowDirectOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<'price' | 'duration'>('price');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
+  const [showDirectOnly, setShowDirectOnly] = useQueryState('showDirectOnly', parseAsBoolean.withDefault(false));
+  const [sortBy, setSortBy] = useQueryState('sortBy', parseAsStringEnum(['price', 'duration']).withDefault('price'));
+  const [sortOrder, setSortOrder] = useQueryState('sortOrder', parseAsStringEnum(['asc', 'desc']).withDefault('asc'));
+  const selectedFlight = selectedFlightId ? flightOptions.find((flight) => flight.id === selectedFlightId) : null;
   const totalPrice = selectedFlight ? selectedFlight.price * passengers : 0;
 
   const filteredFlights = flightOptions
@@ -137,7 +137,7 @@ function SearchResults({
                 <p className="text-xl font-bold">${flight.price}</p>
                 <Button
                   className="mt-2 bg-green-500 text-white px-4 py-1 rounded hover:bg-green-600"
-                  onClick={() => setSelectedFlight(flight)}
+                  onClick={() => setSelectedFlightId(flight.id)}
                 >
                   {selectedFlight?.id === flight.id ? 'Selected' : 'Select'}
                 </Button>
@@ -173,10 +173,10 @@ function BookingForm({
   passengers: number;
   setPassengers: (value: number) => void;
 }) {
-  const [destination, setDestination] = useState('');
-  const [departure, setDeparture] = useState('');
-  const [arrival, setArrival] = useState('');
-  const [isOneWay, setIsOneWay] = useState(false);
+  const [destination, setDestination] = useQueryState('destination', parseAsString.withDefault(''));
+  const [departure, setDeparture] = useQueryState('departure', parseAsString.withDefault(''));
+  const [arrival, setArrival] = useQueryState('arrival', parseAsString.withDefault(''));
+  const [isOneWay, setIsOneWay] = useQueryState('isOneWay', parseAsBoolean.withDefault(false));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
