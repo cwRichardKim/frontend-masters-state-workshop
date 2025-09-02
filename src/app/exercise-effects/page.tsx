@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useReducer } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,31 +20,114 @@ interface Hotel {
   rating: number;
 }
 
+interface BookingState {
+  status: 'idle' | 'searchingFlights' | 'searchingHotels' | 'error';
+  inputs: {
+    destination: string;
+    startDate: string;
+    endDate: string;
+  };
+  error: string | null;
+  selectedFlight: Flight | null;
+  selectedHotel: Hotel | null;
+}
+
+const initialState: BookingState = {
+  status: 'idle',
+  inputs: {
+    destination: '',
+    startDate: '',
+    endDate: '',
+  },
+  error: null,
+  selectedFlight: null,
+  selectedHotel: null,
+};
+
+type Action = {
+  type: 'UPDATE_DESTINATION';
+  payload: { destination: string; };
+} | {
+  type: 'UPDATE_START_DATE';
+  payload: { startDate: string; };
+} | {
+  type: 'UPDATE_END_DATE';
+  payload: { endDate: string; };
+} | {
+  type: 'SET_FLIGHT_SEARCH_RESULT';
+  payload: { flight: Flight; };
+} | {
+  type: 'SET_ERROR';
+  payload: { error: string; };
+} | {
+  type: 'SET_HOTEL_SEARCH_RESULT';
+  payload: { hotel: Hotel; };
+}
+
+function searchReducer(state: BookingState, action: Action): BookingState {
+  switch (action.type) {
+    case 'UPDATE_DESTINATION':
+      return {
+        ...state,
+        status: !!(action.payload.destination && state.inputs.startDate && state.inputs.endDate) ? 'searchingFlights' : 'idle',
+        inputs: {
+          ...state.inputs,
+          destination: action.payload.destination,
+        },
+        error: null,
+      }
+    case 'UPDATE_START_DATE':
+      return {
+        ...state,
+        status: !!(state.inputs.destination && action.payload.startDate && state.inputs.endDate) ? 'searchingFlights' : 'idle',
+        inputs: {
+          ...state.inputs,
+          startDate: action.payload.startDate,
+        },
+        error: null,
+      }
+    case 'UPDATE_END_DATE':
+      return {
+        ...state,
+        status: !!(state.inputs.destination && state.inputs.startDate && action.payload.endDate) ? 'searchingFlights' : 'idle',
+        inputs: {
+          ...state.inputs,
+          endDate: action.payload.endDate,
+        },
+        error: null,
+      }
+    case 'SET_FLIGHT_SEARCH_RESULT':
+      return {
+        ...state,
+        selectedFlight: action.payload.flight,
+        error: null,
+        status: 'searchingHotels',
+      }
+    case 'SET_ERROR':
+      return {
+        ...state,
+        error: action.payload.error,
+        status: 'error',
+      }
+    case 'SET_HOTEL_SEARCH_RESULT':
+      return {
+        ...state,
+        selectedHotel: action.payload.hotel,
+        error: null,
+        status: 'idle',
+      }
+    default: 
+      return state;
+  } 
+}
+
 export default function TripSearch() {
-  // Input states
-  const [destination, setDestination] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-
   // Search states
-  const [isSearchingFlights, setIsSearchingFlights] = useState(false);
-  const [isSearchingHotels, setIsSearchingHotels] = useState(false);
-  const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
-  const [selectedHotel, setSelectedHotel] = useState<Hotel | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Effect 1: Trigger flight search when inputs change
-  useEffect(() => {
-    if (destination && startDate && endDate) {
-      setIsSearchingFlights(true);
-      setError(null);
-    }
-  }, [destination, startDate, endDate]);
-
+  const [state, dispatch] = useReducer(searchReducer, initialState);
+  const { status, error, selectedFlight, selectedHotel } = state;
+  
   // Effect 2: Simulate flight search
   useEffect(() => {
-    if (!isSearchingFlights) return;
-
     const searchFlights = async () => {
       try {
         // Simulate API call
@@ -73,27 +156,11 @@ export default function TripSearch() {
           prev.price < current.price ? prev : current
         );
 
-        setSelectedFlight(bestFlight);
-        setIsSearchingFlights(false);
+        dispatch({ type: 'SET_FLIGHT_SEARCH_RESULT', payload: { flight: bestFlight } });
       } catch {
-        setError('Failed to search flights');
-        setIsSearchingFlights(false);
+        dispatch({ type: 'SET_ERROR', payload: { error: 'Failed to search flights' } });
       }
     };
-
-    searchFlights();
-  }, [isSearchingFlights]);
-
-  // Effect 3: Trigger hotel search when flight is selected
-  useEffect(() => {
-    if (selectedFlight) {
-      setIsSearchingHotels(true);
-    }
-  }, [selectedFlight]);
-
-  // Effect 4: Simulate hotel search
-  useEffect(() => {
-    if (!isSearchingHotels) return;
 
     const searchHotels = async () => {
       try {
@@ -121,16 +188,18 @@ export default function TripSearch() {
           prev.rating > current.rating ? prev : current
         );
 
-        setSelectedHotel(bestHotel);
-        setIsSearchingHotels(false);
+        dispatch({ type: 'SET_HOTEL_SEARCH_RESULT', payload: { hotel: bestHotel } });
       } catch {
-        setError('Failed to search hotels');
-        setIsSearchingHotels(false);
+        dispatch({ type: 'SET_ERROR', payload: { error: 'Failed to search hotels' } });
       }
     };
 
-    searchHotels();
-  }, [isSearchingHotels]);
+    if (status === 'searchingFlights') {
+      searchFlights();
+    } else if (status === 'searchingHotels') {
+      searchHotels();
+    }
+  }, [status]);
 
   return (
     <div className="p-8 w-full max-w-2xl mx-auto space-y-8">
@@ -143,7 +212,7 @@ export default function TripSearch() {
             <Label htmlFor="destination">Destination</Label>
             <Input
               id="destination"
-              onBlur={(e) => setDestination(e.target.value.trim())}
+              onBlur={(e) => dispatch({ type: 'UPDATE_DESTINATION', payload: { destination: e.target.value.trim() } })}
               placeholder="Enter destination"
             />
           </div>
@@ -153,8 +222,8 @@ export default function TripSearch() {
             <Input
               id="startDate"
               type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              value={state.inputs.startDate}
+              onChange={(e) => dispatch({ type: 'UPDATE_START_DATE', payload: { startDate: e.target.value } })}
             />
           </div>
 
@@ -163,8 +232,8 @@ export default function TripSearch() {
             <Input
               id="endDate"
               type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              value={state.inputs.endDate}
+              onChange={(e) => dispatch({ type: 'UPDATE_END_DATE', payload: { endDate: e.target.value } })}
             />
           </div>
         </CardContent>
@@ -177,12 +246,12 @@ export default function TripSearch() {
       )}
 
       <div className="space-y-6">
-        <Card className={isSearchingFlights ? 'opacity-50' : ''}>
+        <Card className={status === 'searchingFlights' ? 'opacity-50' : ''}>
           <CardHeader>
             <CardTitle>Flight Search</CardTitle>
           </CardHeader>
           <CardContent>
-            {isSearchingFlights ? (
+            {status === 'searchingFlights' ? (
               <p>Searching for flights...</p>
             ) : selectedFlight ? (
               <div className="space-y-2">
@@ -198,14 +267,14 @@ export default function TripSearch() {
 
         <Card
           className={
-            isSearchingHotels || isSearchingFlights ? 'opacity-50' : ''
+            status === 'searchingHotels' || status === 'searchingFlights' ? 'opacity-50' : ''
           }
         >
           <CardHeader>
             <CardTitle>Hotel Search</CardTitle>
           </CardHeader>
           <CardContent>
-            {isSearchingHotels ? (
+            {status === 'searchingHotels' ? (
               <p>Searching for hotels...</p>
             ) : selectedHotel ? (
               <div className="space-y-2">
